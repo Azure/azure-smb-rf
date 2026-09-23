@@ -11,12 +11,12 @@
 [![MIT License][license-shield]][license-url]
 [![Azure][azure-shield]][azure-url]
 [![Version](https://img.shields.io/badge/version-v0.10.0-blue?style=for-the-badge)](VERSION.md)
-[![Docs](https://img.shields.io/github/actions/workflow/status/jonathan-vella/azure-smb-rf/deploy-docs.yml?style=for-the-badge&label=docs)](https://jonathan-vella.github.io/azure-smb-rf/)
+[![Docs](https://img.shields.io/github/actions/workflow/status/Azure/azure-smb-rf/deploy-docs.yml?style=for-the-badge&label=docs)](https://azure.github.io/azure-smb-rf/)
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/jonathan-vella/azure-smb-rf">
+  <a href="https://github.com/Azure/azure-smb-rf">
     <img src="docs/images/architecture.png" alt="Azure SMB Ready Foundations" width="520">
   </a>
 
@@ -30,9 +30,9 @@
     <br />
     <a href="#-quick-start"><strong>Quick Start »</strong></a>
     ·
-    <a href="https://github.com/jonathan-vella/azure-smb-rf/issues/new?labels=bug">Report Bug</a>
+    <a href="https://github.com/Azure/azure-smb-rf/issues/new?labels=bug">Report Bug</a>
     ·
-    <a href="https://github.com/jonathan-vella/azure-smb-rf/issues/new?labels=enhancement">Request Feature</a>
+    <a href="https://github.com/Azure/azure-smb-rf/issues/new?labels=enhancement">Request Feature</a>
   </p>
 </div>
 
@@ -111,7 +111,7 @@ and 33 MG-scoped governance policies.
 
 ```bash
 # 1. Clone and navigate
-git clone https://github.com/jonathan-vella/azure-smb-rf.git
+git clone https://github.com/Azure/azure-smb-rf.git
 cd azure-smb-rf/infra/bicep/smb-ready-foundation
 
 # 2. Create management group (one-time)
@@ -233,7 +233,7 @@ infra/bicep/smb-ready-foundation/
 
 ## 📚 Documentation
 
-Full documentation is available in the [docs site](https://jonathan-vella.github.io/azure-smb-rf/):
+Full documentation is available in the [docs site](https://azure.github.io/azure-smb-rf/):
 
 ---
 
@@ -262,21 +262,21 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 ---
 
 <div align="center">
-  <p>Made with ❤️ by <a href="https://github.com/jonathan-vella">Jonathan Vella</a></p>
+  <p>Made with ❤️ by <a href="https://github.com/jonathan-vella">Jonathan Vella</a> and <a href="https://github.com/azureholic">Remco Brosky</a></p>
 </div>
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
-[contributors-shield]: https://img.shields.io/github/contributors/jonathan-vella/azure-smb-rf.svg?style=for-the-badge
-[contributors-url]: https://github.com/jonathan-vella/azure-smb-rf/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/jonathan-vella/azure-smb-rf.svg?style=for-the-badge
-[forks-url]: https://github.com/jonathan-vella/azure-smb-rf/network/members
-[stars-shield]: https://img.shields.io/github/stars/jonathan-vella/azure-smb-rf.svg?style=for-the-badge
-[stars-url]: https://github.com/jonathan-vella/azure-smb-rf/stargazers
-[issues-shield]: https://img.shields.io/github/issues/jonathan-vella/azure-smb-rf.svg?style=for-the-badge
-[issues-url]: https://github.com/jonathan-vella/azure-smb-rf/issues
-[license-shield]: https://img.shields.io/github/license/jonathan-vella/azure-smb-rf.svg?style=for-the-badge
-[license-url]: https://github.com/jonathan-vella/azure-smb-rf/blob/main/LICENSE
+[contributors-shield]: https://img.shields.io/github/contributors/Azure/azure-smb-rf.svg?style=for-the-badge
+[contributors-url]: https://github.com/Azure/azure-smb-rf/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/Azure/azure-smb-rf.svg?style=for-the-badge
+[forks-url]: https://github.com/Azure/azure-smb-rf/network/members
+[stars-shield]: https://img.shields.io/github/stars/Azure/azure-smb-rf.svg?style=for-the-badge
+[stars-url]: https://github.com/Azure/azure-smb-rf/stargazers
+[issues-shield]: https://img.shields.io/github/issues/Azure/azure-smb-rf.svg?style=for-the-badge
+[issues-url]: https://github.com/Azure/azure-smb-rf/issues
+[license-shield]: https://img.shields.io/github/license/Azure/azure-smb-rf.svg?style=for-the-badge
+[license-url]: https://github.com/Azure/azure-smb-rf/blob/main/LICENSE
 [azure-shield]: https://img.shields.io/badge/Azure-Ready-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white
 [azure-url]: https://azure.microsoft.com
 [bicep-shield]: https://img.shields.io/badge/Bicep-0.30+-00A4EF?style=for-the-badge&logo=azurefunctions&logoColor=white
