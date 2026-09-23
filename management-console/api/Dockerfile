@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:10.0-azurelinux3.0 AS build
 WORKDIR /src
-COPY ManagementConsole.Api.csproj ./
-RUN dotnet restore
+COPY ManagementConsole.Api.csproj packages.lock.json ./
+RUN dotnet restore --locked-mode
 COPY . .
 RUN dotnet publish -c Release -o /app /p:UseAppHost=false
 

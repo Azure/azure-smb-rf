@@ -1,0 +1,89 @@
+name: Management Console
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "management-console/**"
+      - ".github/workflows/management-console.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-supply-chain:
+    name: Web supply-chain validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: management-console/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: management-console/web/package-lock.json
+
+      - name: Install without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Audit vulnerabilities
+        run: npm audit --audit-level=low
+
+      - name: Verify registry signatures and provenance
+        run: npm audit signatures --registry=https://registry.npmjs.org/
+
+  web-build:
+    name: Web production build
+    needs: web-supply-chain
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: management-console/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: management-console/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  api-build:
+    name: API restore, audit, and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: management-console/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore and fail on vulnerable packages
+        run: >-
+          dotnet restore ManagementConsole.Api.csproj --locked-mode
+          -p:NuGetAudit=true
+          -p:NuGetAuditMode=all
+          '-warnaserror:NU1901;NU1902;NU1903;NU1904'
+
+      - name: Build
+        run: dotnet build ManagementConsole.Api.csproj --configuration Release --no-restore

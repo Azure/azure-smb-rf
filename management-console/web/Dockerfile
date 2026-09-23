@@ -6,7 +6,7 @@ WORKDIR /src
 # Azure Linux's node:24 ships with a recent npm; bump to latest npm 11.x.
 RUN npm install -g npm@11
 COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY . .
 # Feature flags baked into the SPA bundle at build time by Vite.
 # Default to disabled; override via --build-arg or via .env.production

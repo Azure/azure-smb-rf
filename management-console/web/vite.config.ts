@@ -8,11 +8,17 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          msal: ["@azure/msal-browser", "@azure/msal-react"],
-          fluent: ["@fluentui/react-components"],
-          query: ["@tanstack/react-query"],
+        manualChunks(id) {
+          if (id.includes("/node_modules/@azure/msal-")) return "msal";
+          if (id.includes("/node_modules/@fluentui/")) return "fluent";
+          if (id.includes("/node_modules/@tanstack/react-query/")) return "query";
+          if (
+            /\/node_modules\/(react|react-dom|react-router|react-router-dom)\//.test(
+              id,
+            )
+          ) {
+            return "react";
+          }
         },
       },
     },
