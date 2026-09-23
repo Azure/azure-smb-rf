@@ -1,0 +1,473 @@
+// ============================================================================
+// SMB Ready Foundations - Main Orchestration Template
+// ============================================================================
+// Purpose: Cost-optimized Azure SMB Ready Foundations for VMware-to-Azure migrations
+// Version: v0.4
+// Generated: 2026-04-15
+// Deployment Order: MG Policies (via preprovision hook) → Sub Resources → Firewall → VPN → Peering
+// Management Group: smb-rf (policies deployed at MG scope, infra at subscription scope)
+// ============================================================================
+// Deployment Scenarios:
+// - baseline:   NAT Gateway only (~$48/mo) - cloud-native, no hybrid
+// - firewall:   Azure Firewall + UDR (~$336/mo) - egress filtering
+// - vpn:        VPN Gateway + Gateway Transit (~$187/mo) - hybrid connectivity
+// - full:       Firewall + VPN + UDR (~$476/mo) - complete security
+// ============================================================================
+
+targetScope = 'subscription'
+
+// ============================================================================
+// Parameters
+// ============================================================================
+
+@description('Deployment scenario preset (determines which optional services are deployed)')
+@allowed([
+  'baseline'
+  'firewall'
+  'vpn'
+  'full'
+])
+param scenario string = 'baseline'
+
+@description('Primary deployment region')
+// we now allow all regions, no restriction at template level
+// allthough we advise to stick to swedencentral and germanywestcentral. The template has
+// been tested and validated in those regions, but should work in any region that supports the deployed services. 
+// We removed the allowed values constraint to give users flexibility to deploy in their preferred region,
+ // but they should be aware of potential service availability differences and test accordingly.
+// @allowed([
+//   'swedencentral'
+//   'germanywestcentral'
+// ])
+param location string = 'swedencentral'
+
+@description('Environment name for resource naming and tagging')
+@allowed([
+  'dev'
+  'staging'
+  'prod'
+])
+param environment string = 'prod'
+
+@description('Owner email or team name (required for tagging)')
+param owner string
+
+@description('Hub VNet address space CIDR')
+param hubVnetAddressSpace string = '10.0.0.0/16'
+
+@description('Spoke VNet address space CIDR')
+param spokeVnetAddressSpace string = '10.1.0.0/16'
+
+@description('On-premises network address space CIDR. Required when scenario in (vpn, full) for the Local Network Gateway. Routing behaviour: in scenarios `vpn` and `firewall`, spoke<->on-prem traffic uses gateway-propagated routes from the Local Network Gateway and bypasses the firewall (BGP is disabled; treated as trusted east-west). In scenario `full`, this CIDR is used to install UDRs and firewall network rules that force spoke<->on-prem traffic through Azure Firewall in both directions.')
+param onPremisesAddressSpace string = ''
+
+@description('Public IP address of the on-premises VPN device. Default is RFC 5737 TEST-NET-1 (192.0.2.1) for template validation; must be overridden to deploy VPN Gateway and Local Network Gateway resources when scenario in (vpn, full).')
+param onPremisesGatewayPublicIp string = '192.0.2.1'
+
+@description('Log Analytics daily ingestion cap in GB (decimal, e.g. 0.5 for ~500MB)')
+param logAnalyticsDailyCapGb string = '0.5'
+
+@description('Monthly budget amount in USD')
+@minValue(100)
+@maxValue(10000)
+param budgetAmount int = 500
+
+@description('Budget alert email address')
+param budgetAlertEmail string = owner
+
+@description('Budget start date - uses current month. Azure Budgets cannot update start date after creation, so the preprovision hook deletes existing budget before redeployment.')
+param budgetStartDate string = utcNow('yyyy-MM-01')
+
+@description('Optional resource id of a pre-created User-Assigned Managed Identity (UAMI) to use for the smb-backup-02 DINE policy. When set, the policy assignment uses this UAMI instead of a SystemAssigned MI and the in-template Backup/VM Contributor role assignments are skipped (caller must have pre-granted them). Used by the partner management console flow where Lighthouse-delegated UAA cannot grant roles to a customer-tenant SystemAssigned MI. Leave empty for direct customer-admin deployments.')
+param policyMiResourceId string = ''
+
+// ============================================================================
+// Variables - Scenario-Derived Feature Flags
+// ============================================================================
+
+// Derive feature flags from scenario parameter
+var deployFirewall = scenario == 'firewall' || scenario == 'full'
+var deployVpnGateway = scenario == 'vpn' || scenario == 'full'
+
+// scenario=full: force spoke<->on-prem traffic through the firewall in both
+// directions. Requires firewall + VPN gateway + a non-empty on-prem CIDR.
+var routeHybridThroughFirewall = scenario == 'full' && !empty(onPremisesAddressSpace)
+
+// Unique suffix for globally unique resource names
+var uniqueSuffix = uniqueString(subscription().subscriptionId)
+
+// Region abbreviation for naming
+var regionAbbreviations = {
+  swedencentral: 'swc'
+  germanywestcentral: 'gwc'
+}
+var regionShort = regionAbbreviations[location]
+
+// Determine if peering is needed (requires Firewall or VPN Gateway)
+var deployPeering = deployFirewall || deployVpnGateway
+
+// Determine if NAT Gateway should be deployed (only when no firewall)
+var deploySpokeNatGateway = !deployFirewall
+
+// Tags for shared services (hub, monitor, backup, migrate) - hardcoded 'smb'
+var sharedServicesTags = {
+  Environment: 'smb'
+  Owner: owner
+  Project: 'smb-ready-foundation'
+  ManagedBy: 'Bicep'
+}
+
+// Tags for spoke resources (environment-specific)
+var spokeTags = {
+  Environment: environment
+  Owner: owner
+  Project: 'smb-ready-foundation'
+  ManagedBy: 'Bicep'
+}
+
+// Resource group names - shared services use 'smb', spoke uses environment
+var rgNames = {
+  hub: 'rg-hub-smb-${regionShort}'
+  spoke: 'rg-spoke-${environment}-${regionShort}'
+  monitor: 'rg-monitor-smb-${regionShort}'
+  backup: 'rg-backup-smb-${regionShort}'
+  migrate: 'rg-migrate-smb-${regionShort}'
+  security: 'rg-security-smb-${regionShort}'
+}
+
+// ============================================================================
+// Module Deployments
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Phase 1: Subscription-Scope Resources (Budget + Defender)
+// Note: The MG-scoped baseline initiative (33 policies, 1 assignment) is
+//       deployed via the preprovision hook using az deployment mg create.
+//       See modules/policy-assignments-mg-initiative.bicep.
+//       The auto-backup policy (smb-backup-02) is deployed in Phase 4
+//       after the Recovery Services Vault is created.
+// ----------------------------------------------------------------------------
+
+@description('Deploy Cost Management budget with alerts')
+module budget 'modules/budget.bicep' = {
+  name: 'budget-${uniqueSuffix}'
+  params: {
+    budgetAmount: budgetAmount
+    alertEmail: budgetAlertEmail
+    startDate: budgetStartDate
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Phase 2: Resource Groups
+// ----------------------------------------------------------------------------
+
+@description('Create resource groups for SMB Ready Foundations workloads')
+module resourceGroups 'modules/resource-groups.bicep' = {
+  name: 'resource-groups-${uniqueSuffix}'
+  params: {
+    location: location
+    environment: environment
+    regionShort: regionShort
+    sharedServicesTags: sharedServicesTags
+    spokeTags: spokeTags
+  }
+  dependsOn: [
+    budget
+  ]
+}
+
+// ----------------------------------------------------------------------------
+// Phase 2.5: Log Analytics (deployed early so dependent modules can wire
+// diagnostic settings during initial create)
+// ----------------------------------------------------------------------------
+
+@description('Deploy Log Analytics Workspace with daily cap')
+module monitoring 'modules/monitoring.bicep' = {
+  name: 'monitoring-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.monitor)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    dailyCapGb: logAnalyticsDailyCapGb
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+// ----------------------------------------------------------------------------
+// Phase 3: Core Networking
+// ----------------------------------------------------------------------------
+
+@description('Deploy hub VNet with NSG and Private DNS Zone')
+module networkingHub 'modules/networking-hub.bicep' = {
+  name: 'networking-hub-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.hub)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    vnetAddressSpace: hubVnetAddressSpace
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+@description('Deploy spoke VNet with conditional NAT Gateway')
+module networkingSpoke 'modules/networking-spoke.bicep' = {
+  name: 'networking-spoke-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.spoke)
+  params: {
+    location: location
+    environment: environment
+    regionShort: regionShort
+    vnetAddressSpace: spokeVnetAddressSpace
+    deployNatGateway: deploySpokeNatGateway
+    #disable-next-line BCP318
+    routeTableId: deployFirewall ? routeTables.outputs.spokeRouteTableId : ''
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: spokeTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+// ----------------------------------------------------------------------------
+// Phase 4: Supporting Services
+// ----------------------------------------------------------------------------
+
+@description('Deploy Recovery Services Vault for VM backup')
+module backup 'modules/backup.bicep' = {
+  name: 'backup-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.backup)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+@description('Deploy auto-backup policy for VMs tagged with Backup:true')
+module policyBackupAuto 'modules/policy-backup-auto.bicep' = {
+  name: 'policy-backup-auto-${uniqueSuffix}'
+  params: {
+    location: location
+    defaultVmBackupPolicyId: backup.outputs.defaultVmPolicyId
+    policyMiResourceId: policyMiResourceId
+  }
+}
+
+@description('Deploy Azure Migrate project for VMware assessment')
+module migrate 'modules/migrate.bicep' = {
+  name: 'migrate-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.migrate)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+@description('Deploy Azure Key Vault with private endpoint in spoke PE subnet')
+module keyVault 'modules/keyvault.bicep' = {
+  name: 'keyvault-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.security)
+  params: {
+    location: location
+    regionShort: regionShort
+    environment: environment
+    uniqueSuffix: uniqueSuffix
+    pepSubnetId: networkingSpoke.outputs.pepSubnetId
+    spokeVnetId: networkingSpoke.outputs.vnetId
+    hubVnetId: networkingHub.outputs.vnetId
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+@description('Enable Microsoft Defender for Cloud Free tier')
+module defender 'modules/defender.bicep' = {
+  name: 'defender-${uniqueSuffix}'
+  params: {
+    location: location
+  }
+}
+
+@description('Deploy Azure Automation Account linked to Log Analytics')
+module automation 'modules/automation.bicep' = {
+  name: 'automation-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.monitor)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: sharedServicesTags
+  }
+  dependsOn: [
+    resourceGroups
+  ]
+}
+
+// ----------------------------------------------------------------------------
+// Phase 5: Optional Services (Firewall, Route Tables, VPN Gateway)
+// ----------------------------------------------------------------------------
+
+@description('Deploy Azure Firewall Basic with sequential PIP creation for reliability (optional)')
+module firewall 'modules/firewall.bicep' = if (deployFirewall) {
+  name: 'firewall-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.hub)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    hubVnetId: networkingHub.outputs.vnetId
+    spokeAddressSpace: spokeVnetAddressSpace
+    onPremisesAddressSpace: routeHybridThroughFirewall ? onPremisesAddressSpace : ''
+    logAnalyticsWorkspaceId: monitoring.outputs.workspaceId
+    tags: sharedServicesTags
+  }
+}
+
+@description('Deploy route tables for firewall routing (conditional)')
+module routeTables 'modules/route-tables.bicep' = if (deployFirewall) {
+  name: 'route-tables-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.hub)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    #disable-next-line BCP318
+    firewallPrivateIp: firewall.outputs.firewallPrivateIp
+    onPremisesAddressSpace: onPremisesAddressSpace
+    spokeVnetAddressSpace: spokeVnetAddressSpace
+    hubVnetName: networkingHub.outputs.vnetName
+    gatewaySubnetAddressPrefix: networkingHub.outputs.gatewaySubnetAddressPrefix
+    routeHybridThroughFirewall: routeHybridThroughFirewall
+    tags: sharedServicesTags
+  }
+}
+
+@description('Deploy VPN Gateway VpnGw1AZ (optional, zone-redundant) and an optional Local Network Gateway')
+module vpnGateway 'modules/vpn-gateway.bicep' = if (deployVpnGateway) {
+  name: 'vpn-gateway-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.hub)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    gatewaySubnetId: networkingHub.outputs.gatewaySubnetId
+    onPremisesAddressSpace: onPremisesAddressSpace
+    onPremisesGatewayPublicIp: onPremisesGatewayPublicIp
+    tags: sharedServicesTags
+  }
+  // CRITICAL: Serialize VPN Gateway after Firewall to avoid VNet update race condition
+  // Both modify hub VNet subnets; parallel deployment causes InternalServerError
+  // See ADR-0004 for root cause analysis. In scenario=full we additionally wait
+  // for routeTables, which PATCHes GatewaySubnet to attach the gateway route
+  // table; running VPN gateway provisioning in parallel with that PATCH would
+  // cause "subnet in use" conflicts.
+  #disable-next-line BCP319
+  dependsOn: routeHybridThroughFirewall ? [firewall, routeTables] : (deployFirewall ? [firewall] : [])
+}
+
+// ----------------------------------------------------------------------------
+// Phase 6: VNet Peering (Conditional - only if Firewall or VPN deployed)
+// ----------------------------------------------------------------------------
+
+@description('Configure hub-spoke VNet peering (conditional)')
+module networkingPeering 'modules/networking-peering.bicep' = if (deployPeering) {
+  name: 'networking-peering-${uniqueSuffix}'
+  scope: resourceGroup(rgNames.hub)
+  params: {
+    location: location
+    environment: 'smb'
+    regionShort: regionShort
+    tags: sharedServicesTags
+    hubVnetName: networkingHub.outputs.vnetName
+    hubVnetId: networkingHub.outputs.vnetId
+    spokeVnetName: networkingSpoke.outputs.vnetName
+    spokeVnetId: networkingSpoke.outputs.vnetId
+    spokeResourceGroupName: rgNames.spoke
+    allowGatewayTransit: deployVpnGateway
+    useRemoteGateways: deployVpnGateway
+  }
+  // Peering must wait for VPN Gateway when useRemoteGateway is true
+  // Always include vpnGateway in dependsOn when deployVpnGateway is true
+  #disable-next-line BCP319
+  dependsOn: [
+    vpnGateway
+  ]
+}
+
+// ============================================================================
+// Outputs
+// ============================================================================
+
+@description('Deployment scenario used')
+output deploymentScenario string = scenario
+
+@description('Feature flags derived from scenario')
+output featureFlags object = {
+  firewall: deployFirewall
+  vpnGateway: deployVpnGateway
+  natGateway: deploySpokeNatGateway
+  peering: deployPeering
+}
+
+@description('Resource group names for reference')
+output resourceGroupNames object = rgNames
+
+@description('Hub VNet resource ID')
+output hubVnetId string = networkingHub.outputs.vnetId
+
+@description('Spoke VNet resource ID')
+output spokeVnetId string = networkingSpoke.outputs.vnetId
+
+@description('Log Analytics Workspace ID')
+output logAnalyticsWorkspaceId string = monitoring.outputs.workspaceId
+
+@description('Recovery Services Vault ID')
+output recoveryServicesVaultId string = backup.outputs.vaultId
+
+@description('Azure Migrate Project ID')
+output migrateProjectId string = migrate.outputs.projectId
+
+@description('NAT Gateway name (if deployed)')
+output natGatewayName string = networkingSpoke.outputs.natGatewayName
+
+@description('Azure Firewall private IP (if deployed)')
+#disable-next-line BCP318
+output firewallPrivateIp string = deployFirewall && firewall != null ? firewall.outputs.firewallPrivateIp : ''
+
+@description('VPN Gateway public IP (if deployed)')
+#disable-next-line BCP318
+output vpnGatewayPublicIp string = deployVpnGateway && vpnGateway != null ? vpnGateway.outputs.gatewayPublicIp : ''
+
+@description('Key Vault name')
+output keyVaultName string = keyVault.outputs.keyVaultName
+
+@description('Key Vault URI')
+output keyVaultUri string = keyVault.outputs.keyVaultUri
+
+@description('Automation Account name')
+output automationAccountName string = automation.outputs.automationAccountName
