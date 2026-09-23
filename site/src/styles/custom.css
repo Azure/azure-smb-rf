@@ -841,6 +841,10 @@ header.header site-search .dialog-frame > div {
   box-shadow: var(--shadow-sm);
 }
 
+.metric-grid > .metric {
+  margin-top: 0;
+}
+
 .metric .m-value {
   display: block;
   font-size: var(--fs-xl);

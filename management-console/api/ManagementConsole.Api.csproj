@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RootNamespace>ManagementConsole.Api</RootNamespace>
     <AssemblyName>ManagementConsole.Api</AssemblyName>
     <UserSecretsId>05c3b9e5-9deb-465c-a956-1a685202fdb1</UserSecretsId>

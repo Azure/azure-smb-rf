@@ -1,19 +1,20 @@
----
-title: Contributing
-description: How to contribute to Azure SMB Ready Foundations
----
+# Contributing to Azure SMB Ready Foundations
 
-import { Aside } from "@astrojs/starlight/components";
+Thank you for contributing to Azure SMB Ready Foundations. This repository
+contains two infrastructure-as-code implementations, an Astro documentation
+site, and a partner management console. Set up and validate only the components
+your change affects; there is no root Node.js project or repository-wide
+`npm install` command.
 
-Azure SMB Ready Foundations contains two infrastructure-as-code
-implementations, this Astro documentation site, and a partner management
-console. Set up and validate only the components your change affects; there is
-no root Node.js project or repository-wide `npm install` command.
+## Code of Conduct
 
-The complete contribution policy is also available in
-[CONTRIBUTING.md](https://github.com/Azure/azure-smb-rf/blob/main/CONTRIBUTING.md).
+This project follows the
+[Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+By participating, you are expected to uphold it.
 
-## Prerequisites
+## Before You Start
+
+Install Git and the tools required for the area you plan to change:
 
 | Area | Required tools |
 | --- | --- |
@@ -24,9 +25,10 @@ The complete contribution policy is also available in
 | Management Console web app | Node.js 20 or later and npm |
 | Management Console deployment | Docker, Azure CLI, `azd`, PowerShell 7 |
 
-Azure authentication is not required for static Bicep, Terraform, or
-documentation validation. Deployments and scenario tests require the
-appropriate tenant, management-group, subscription, and Entra permissions.
+Azure authentication is not required for the static Bicep, Terraform, and
+documentation validation commands below. Deployments and the scenario test
+runners create or delete Azure resources and require the appropriate tenant,
+management-group, subscription, and Entra permissions.
 
 ## Getting Started
 
@@ -49,8 +51,13 @@ appropriate tenant, management-group, subscription, and Entra permissions.
 4. Install dependencies only for the component you are changing:
 
    ```bash
+   # Documentation site
    npm ci --prefix site
+
+   # Management Console web app
    npm ci --prefix management-console/web
+
+   # Management Console API
    dotnet restore management-console/api/ManagementConsole.Api.csproj
    ```
 
@@ -63,7 +70,8 @@ Use a short, descriptive branch name such as:
 - `docs/update-quick-start`
 - `ci/update-terraform-validation`
 
-Conventional Commit-style messages are preferred:
+Conventional Commit-style messages are preferred because they make history
+easier to scan:
 
 ```text
 feat(bicep): add a network option
@@ -71,13 +79,13 @@ fix(terraform): correct VPN route propagation
 docs(site): update deployment prerequisites
 ```
 
-Keep commits focused. Do not commit credentials, generated output, Azure state,
-or local environment files.
+Keep commits focused and do not include generated output, local environments,
+credentials, state files, or secrets.
 
 ## Validation
 
 Run the checks for every component your change touches. The Bicep, Terraform,
-and documentation commands below mirror the current GitHub Actions workflows.
+and site commands mirror the current GitHub Actions workflows.
 
 ### Bicep
 
@@ -106,7 +114,8 @@ tflint --format=compact
 terraform test
 ```
 
-Do not commit `.terraform/`, local `*.tfvars`, plans, or state files.
+Do not commit `.terraform/`, local `*.tfvars`, plans, or state files. The
+committed `terraform.tfvars.example` is the safe example configuration.
 
 ### Documentation Site
 
@@ -135,33 +144,30 @@ npm run build --prefix management-console/web
 Pull requests also verify npm registry signatures and provenance, audit all
 transitive NuGet dependencies, and fail on NuGet advisory warnings.
 
-For local development, first provision or select an `azd` environment with the
-required Entra and Azure values, then run:
+For local development, first provision or select an `azd` environment that
+contains the required Entra and Azure resource values, then run:
 
 ```powershell
 pwsh ./management-console/runlocal.ps1
 ```
 
-See the
-[Management Console README](https://github.com/Azure/azure-smb-rf/blob/main/management-console/README.md)
-for permissions, architecture, environment variables, and deployment details.
+See `management-console/README.md` for permissions, architecture, environment
+variables, and deployment instructions.
 
 ### Azure Deployment Tests
 
-The scripts in `scripts/` exercise all scenarios against a real Azure
-subscription:
+The scripts in `scripts/` exercise all deployment scenarios against a real
+Azure subscription:
 
 ```powershell
 pwsh ./scripts/test-scenarios.ps1
 pwsh ./scripts/test-scenarios-tf.ps1
 ```
 
-<Aside type="caution" title="Billable integration tests">
-  These scripts deploy and tear down Azure resources. Review their configuration
-  and confirm the active subscription and tenant before running them.
-</Aside>
-
-Bash equivalents are available for both IaC tracks.
+Bash equivalents are available for both tracks. These are integration tests,
+not routine local checks: they deploy and tear down billable Azure resources.
+Review the script configuration and confirm the active subscription and tenant
+before running them.
 
 ## Pull Requests
 
@@ -172,19 +178,20 @@ Before opening a pull request:
 3. Run all validation relevant to the changed files.
 4. Update documentation when behavior, prerequisites, parameters, or workflows
    change.
-5. Include validation results and identify any checks you could not run.
+5. Include validation results and note any checks you could not run.
 6. Confirm that no secrets, generated output, Azure state, or local environment
    files are included.
 7. Complete the pull request template, checking only the items that apply and
    explaining any relevant checks you could not run.
 
-Open the pull request against the `main` branch of `Azure/azure-smb-rf`.
-Reviewers may request deployment evidence for changes that affect Azure
-resources, permissions, policies, or teardown behavior.
+Open the pull request against the `main` branch of
+`Azure/azure-smb-rf`. Reviewers may request additional deployment evidence for
+changes that affect Azure resources, permissions, policies, or teardown
+behavior.
 
-## Key Directories
+## Repository Layout
 
-| Directory | Purpose |
+| Path | Purpose |
 | --- | --- |
 | `.github/dependabot.yml` | Automated npm and NuGet dependency updates |
 | `.github/workflows/` | Bicep, Terraform, and documentation CI workflows |
@@ -195,18 +202,22 @@ resources, permissions, policies, or teardown behavior.
 | `management-console/worker/` | Container Apps Job worker image |
 | `management-console/infra/` | Management Console Bicep infrastructure |
 | `management-console/lighthouse/` | Azure Lighthouse onboarding template |
-| `scripts/` | Deployment scenario tests and cleanup tooling |
-| `site/src/content/docs/` | Documentation content |
+| `scripts/` | Azure deployment scenario test runners and cleanup tooling |
+| `site/src/content/docs/` | Astro Starlight documentation content |
 | `site/src/components/` | Documentation site components |
-| `site/src/styles/` | Documentation site styles |
+| `site/src/styles/` | Documentation site styling |
 | `docs/` | Supporting reference documents and images |
 
-## Issues and Security
+## Reporting Bugs and Requesting Features
 
 Open an issue in
-[Azure/azure-smb-rf](https://github.com/Azure/azure-smb-rf/issues) with a clear
-description, reproduction steps or use case, the affected component, relevant
-tool versions, and sanitized logs.
+[Azure/azure-smb-rf](https://github.com/Azure/azure-smb-rf/issues) and include:
+
+- a clear description and expected behavior;
+- steps to reproduce or a concrete use case;
+- the affected IaC track or application component;
+- relevant tool versions and environment details; and
+- sanitized logs or error messages when applicable.
 
 Never include credentials, tokens, subscription secrets, tenant-private data,
 or unredacted deployment output.
@@ -214,4 +225,4 @@ or unredacted deployment output.
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
-[MIT License](https://github.com/Azure/azure-smb-rf/blob/main/LICENSE).
+[MIT License](LICENSE).

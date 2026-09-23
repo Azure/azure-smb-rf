@@ -54,6 +54,7 @@ build/
 # Node
 node_modules/
 .pnpm-store/
+*.tsbuildinfo
 
 # Python (if any scripts)
 __pycache__/
