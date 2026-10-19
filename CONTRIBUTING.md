@@ -75,7 +75,10 @@ CFS proxies:
   API's standalone Docker build context; keep these files in sync.
 
 Local restores, container builds, GitHub Actions, and Dependabot use these same
-sources. npm lockfile download URLs also use CFS. Keep package versions and
+sources. Dependabot reads the committed `.npmrc` and `NuGet.config` files; do not
+declare these anonymous feeds under `registries:` in `dependabot.yml`, because
+Dependabot's schema requires credentials for registry entries and rejects the
+file. npm lockfile download URLs also use CFS. Keep package versions and
 integrity hashes when changing only the registry. There are no package-source
 credentials or public-registry fallbacks: restoration fails closed if CFS is
 unavailable. `npm audit signatures` is not used because npm cannot verify
@@ -194,7 +197,7 @@ before running them.
 ### Dependabot Approval and Auto-merge
 
 [Dependabot](.github/dependabot.yml) checks both npm projects and the API weekly
-using the same CFS registries, retaining per-project update groups. Updates of any
+using the committed CFS package-source configuration, retaining per-project update groups. Updates of any
 version level are eligible for automatic merging, but only after validation.
 
 The trusted [auto-merge workflow](.github/workflows/dependabot-auto-merge.yml)

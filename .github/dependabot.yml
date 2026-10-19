@@ -1,18 +1,7 @@
 version: 2
-registries:
-  microsoft-cfs-nuget:
-    type: nuget-feed
-    url: https://packagefeedproxy.microsoft.io/nuget/v3/index.json
-  microsoft-cfs-npm:
-    type: npm-registry
-    url: https://packagefeedproxy.microsoft.io/npm/
-    replaces-base: true
-
 updates:
   - package-ecosystem: npm
     directory: /site
-    registries:
-      - microsoft-cfs-npm
     open-pull-requests-limit: 10
     schedule:
       interval: weekly
@@ -28,8 +17,6 @@ updates:
 
   - package-ecosystem: npm
     directory: /management-console/web
-    registries:
-      - microsoft-cfs-npm
     open-pull-requests-limit: 10
     schedule:
       interval: weekly
@@ -45,8 +32,6 @@ updates:
 
   - package-ecosystem: nuget
     directory: /management-console/api
-    registries:
-      - microsoft-cfs-nuget
     open-pull-requests-limit: 10
     schedule:
       interval: weekly
