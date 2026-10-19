@@ -78,8 +78,12 @@ Local restores, container builds, GitHub Actions, and Dependabot use these same
 sources. Dependabot's proxy blocks hosts that are not declared under `registries:`
 in `dependabot.yml` (the update fails with `403 egress not allowlisted`), and the
 schema requires an authentication field for each entry. The CFS feeds are therefore
-declared there with a non-secret placeholder `token`, which CFS accepts and
-ignores. Keep that block in sync with the `.npmrc` and `NuGet.config` files.
+declared there with `token: ${{secrets.CFS_ANONYMOUS_TOKEN}}`; Dependabot rejects
+literal tokens ("Tokens should be stored as a GitHub secret"). Create the
+**Dependabot** repository secret `CFS_ANONYMOUS_TOKEN` with the placeholder value
+`anonymous` (Settings > Secrets and variables > Dependabot). CFS accepts and
+ignores it, so it is not a credential. Keep that block in sync with the `.npmrc`
+and `NuGet.config` files.
 npm lockfile download URLs also use CFS. Keep package versions and
 integrity hashes when changing only the registry. There are no package-source
 credentials or public-registry fallbacks: restoration fails closed if CFS is
