@@ -1,11 +1,18 @@
 version: 2
+# Dependabot's proxy only allows egress to hosts declared under `registries`, so
+# the CFS feeds must be listed here even though they are anonymously readable.
+# The schema requires an authentication field; CFS accepts and ignores this
+# placeholder bearer token. It is not a secret.
 registries:
   microsoft-cfs-nuget:
     type: nuget-feed
     url: https://packagefeedproxy.microsoft.io/nuget/v3/index.json
+    token: anonymous
+    replaces-base: true
   microsoft-cfs-npm:
     type: npm-registry
     url: https://packagefeedproxy.microsoft.io/npm/
+    token: anonymous
     replaces-base: true
 
 updates:
