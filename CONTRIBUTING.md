@@ -61,6 +61,26 @@ management-group, subscription, and Entra permissions.
    dotnet restore management-console/api/ManagementConsole.Api.csproj
    ```
 
+### Package Sources
+
+Application packages resolve exclusively through Microsoft's anonymously readable
+CFS proxies:
+
+- npm: `https://packagefeedproxy.microsoft.io/npm/`, configured in
+  [site/.npmrc](site/.npmrc) and
+  [management-console/web/.npmrc](management-console/web/.npmrc).
+- NuGet: `https://packagefeedproxy.microsoft.io/nuget/v3/index.json`, configured in
+  [NuGet.config](NuGet.config). The identical
+  [API configuration](management-console/api/NuGet.config) also travels with the
+  API's standalone Docker build context; keep these files in sync.
+
+Local restores, container builds, GitHub Actions, and Dependabot use these same
+sources. npm lockfile download URLs also use CFS. Keep package versions and
+integrity hashes when changing only the registry. There are no package-source
+credentials or public-registry fallbacks: restoration fails closed if CFS is
+unavailable. `npm audit signatures` is not used because npm cannot verify
+packages installed from the CFS proxy; `npm audit` is the supply-chain gate.
+
 ## Branches and Commits
 
 Use a short, descriptive branch name such as:
@@ -141,8 +161,10 @@ npm audit --audit-level=low --prefix management-console/web
 npm run build --prefix management-console/web
 ```
 
-Pull requests also verify npm registry signatures and provenance, audit all
-transitive NuGet dependencies, and fail on NuGet advisory warnings.
+Pull requests also audit npm dependencies, audit all transitive NuGet
+dependencies, and fail on NuGet advisory warnings.
+Documentation pull requests run the documentation audit and production build
+without deploying to GitHub Pages.
 
 For local development, first provision or select an `azd` environment that
 contains the required Entra and Azure resource values, then run:
@@ -168,6 +190,41 @@ Bash equivalents are available for both tracks. These are integration tests,
 not routine local checks: they deploy and tear down billable Azure resources.
 Review the script configuration and confirm the active subscription and tenant
 before running them.
+
+### Dependabot Approval and Auto-merge
+
+[Dependabot](.github/dependabot.yml) checks both npm projects and the API weekly
+using the same CFS registries, retaining per-project update groups. Updates of any
+version level are eligible for automatic merging, but only after validation.
+
+The trusted [auto-merge workflow](.github/workflows/dependabot-auto-merge.yml)
+runs after application or documentation CI completes. It never checks out or
+executes pull-request code with its write-enabled token. It verifies that the PR:
+
+- was authored by `dependabot[bot]`, is open and ready for review;
+- comes from this repository and targets its default branch;
+- still has exactly the commit that completed validation; and
+- has successful required checks (skipped or neutral checks are not sufficient).
+
+It then approves that commit and enables squash auto-merge with a matching-head
+guard. A new commit must pass validation again. Failed checks, vulnerabilities,
+merge conflicts, or unmet repository rules block merging; there is no bypass.
+The existing projects have build checks but no unit-test scripts or test projects,
+so this flow does not claim to run unit tests.
+
+Repository administrators must enable **Allow auto-merge** and **Allow GitHub
+Actions to create and approve pull requests**. The default branch must require
+pull requests and the following GitHub Actions checks, without bypass actors:
+
+- `Web supply-chain validation`
+- `Web production build`
+- `API restore, audit, and build`
+- `Build documentation`
+
+Repositories that fork this project must configure these settings separately.
+Workflow automation takes effect once these workflow files are
+merged into the default branch. Documentation CI runs on every pull request so
+its required check is never missing for API-only or web-only dependency updates.
 
 ## Pull Requests
 

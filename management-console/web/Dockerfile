@@ -4,8 +4,8 @@
 FROM mcr.microsoft.com/azurelinux/base/nodejs:24 AS build
 WORKDIR /src
 # Azure Linux's node:24 ships with a recent npm; bump to latest npm 11.x.
-RUN npm install -g npm@11
-COPY package.json package-lock.json* ./
+RUN npm install -g npm@11 --registry=https://packagefeedproxy.microsoft.io/npm/
+COPY .npmrc package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 # Feature flags baked into the SPA bundle at build time by Vite.
