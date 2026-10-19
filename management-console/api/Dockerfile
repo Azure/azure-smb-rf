@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
 FROM mcr.microsoft.com/dotnet/sdk:10.0-azurelinux3.0 AS build
 WORKDIR /src
-COPY ManagementConsole.Api.csproj packages.lock.json ./
+COPY ManagementConsole.Api.csproj packages.lock.json NuGet.config ./
 RUN dotnet restore --locked-mode
 COPY . .
-RUN dotnet publish -c Release -o /app /p:UseAppHost=false
+RUN dotnet publish -c Release -o /app /p:UseAppHost=false --no-restore
 
 # Fetch the official Bicep CLI single-file binary. Bicep is a self-contained
 # .NET binary that requires ICU at runtime, OR globalization-invariant mode.

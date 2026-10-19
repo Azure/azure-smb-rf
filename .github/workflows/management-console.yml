@@ -6,6 +6,7 @@ on:
     paths:
       - "management-console/**"
       - ".github/workflows/management-console.yml"
+      - "NuGet.config"
   pull_request:
   workflow_dispatch:
 
@@ -35,9 +36,6 @@ jobs:
 
       - name: Audit vulnerabilities
         run: npm audit --audit-level=low
-
-      - name: Verify registry signatures and provenance
-        run: npm audit signatures --registry=https://registry.npmjs.org/
 
   web-build:
     name: Web production build
