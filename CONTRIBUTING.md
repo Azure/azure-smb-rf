@@ -215,15 +215,18 @@ executes pull-request code with its write-enabled token. It verifies that the PR
 - still has exactly the commit that completed validation; and
 - has successful required checks (skipped or neutral checks are not sufficient).
 
-It then approves that commit and enables squash auto-merge with a matching-head
+It then approves that commit (when the organization allows Actions to approve pull
+requests; otherwise this step only warns, because the required checks gate the merge)
+and enables squash auto-merge with a matching-head
 guard. A new commit must pass validation again. Failed checks, vulnerabilities,
 merge conflicts, or unmet repository rules block merging; there is no bypass.
 The existing projects have build checks but no unit-test scripts or test projects,
 so this flow does not claim to run unit tests.
 
-Repository administrators must enable **Allow auto-merge** and **Allow GitHub
-Actions to create and approve pull requests**. The default branch must require
-pull requests and the following GitHub Actions checks, without bypass actors:
+Repository administrators must enable **Allow auto-merge**. Optionally enable
+**Allow GitHub Actions to create and approve pull requests** to get the bot
+approval; it is not required while the ruleset requires no approvals. The default
+branch must require pull requests and the following GitHub Actions checks:
 
 - `Web supply-chain validation`
 - `Web production build`

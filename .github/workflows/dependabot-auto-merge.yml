@@ -79,15 +79,19 @@ jobs:
             exit 1
           fi
 
-          approval_count=$(gh api --paginate --slurp \
+          approval_count=$(gh api --paginate \
             "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
-            --jq "[.[][] | select(.user.login == \"github-actions[bot]\" and
-              .state == \"APPROVED\" and .commit_id == \"${VALIDATED_SHA}\")] | length")
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and
+              .state == \"APPROVED\" and .commit_id == \"${VALIDATED_SHA}\") | .id" |
+            wc -l)
 
           if [[ "${approval_count}" == "0" ]]; then
+            # Approval is best-effort: organizations may forbid Actions from
+            # approving pull requests, and the ruleset requires no approvals.
             gh api --method POST "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
               -f event=APPROVE -f commit_id="${VALIDATED_SHA}" \
-              -f body="All required application, documentation, and dependency checks passed for this commit."
+              -f body="All required application, documentation, and dependency checks passed for this commit." ||
+              echo "::warning::Could not approve; continuing because required checks gate the merge."
           fi
 
       - name: Enable squash auto-merge
