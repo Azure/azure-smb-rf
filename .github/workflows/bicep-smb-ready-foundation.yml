@@ -13,10 +13,7 @@ on:
     paths:
       - "infra/bicep/smb-ready-foundation/**"
       - ".github/workflows/bicep-smb-ready-foundation.yml"
-  pull_request:
-    paths:
-      - "infra/bicep/smb-ready-foundation/**"
-      - ".github/workflows/bicep-smb-ready-foundation.yml"
+  pull_request: {}
   workflow_dispatch:
 
 permissions:
@@ -33,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       # Azure CLI (pre-installed on ubuntu-latest) ships with Bicep, but we
       # explicitly upgrade to make the version deterministic across runners.

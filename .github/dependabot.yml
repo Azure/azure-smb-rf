@@ -67,3 +67,20 @@ updates:
           - "*"
     commit-message:
       prefix: "deps(console-api)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    open-pull-requests-limit: 10
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps(actions)"
