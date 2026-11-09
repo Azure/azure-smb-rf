@@ -34,6 +34,32 @@ mock_provider "azurerm" {
       name = "smb-rf"
     }
   }
+
+  # Defender pricing imports are unconditional; mock providers cannot import.
+  override_resource {
+    target = module.defender.azurerm_security_center_subscription_pricing.free["VirtualMachines"]
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/pricings/VirtualMachines"
+    }
+  }
+  override_resource {
+    target = module.defender.azurerm_security_center_subscription_pricing.free["StorageAccounts"]
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/pricings/StorageAccounts"
+    }
+  }
+  override_resource {
+    target = module.defender.azurerm_security_center_subscription_pricing.free["KeyVaults"]
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/pricings/KeyVaults"
+    }
+  }
+  override_resource {
+    target = module.defender.azurerm_security_center_subscription_pricing.free["Arm"]
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/pricings/Arm"
+    }
+  }
 }
 mock_provider "azapi" {}
 
