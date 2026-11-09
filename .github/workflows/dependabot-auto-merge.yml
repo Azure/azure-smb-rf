@@ -5,6 +5,8 @@ on:
     workflows:
       - Management Console
       - Deploy Docs to GitHub Pages
+      - Terraform — smb-ready-foundation
+      - Bicep — smb-ready-foundation
     types:
       - completed
 
@@ -51,6 +53,14 @@ jobs:
             exit 0
           fi
 
+          pr_diff=$(gh pr diff "${PR_NUMBER}" --repo "${REPOSITORY}")
+          if grep -Eq '^[+-][[:space:]]*uses:[[:space:]]*actions/(deploy-pages|upload-pages-artifact)@' \
+            <<< "${pr_diff}"; then
+            echo "Pages deployment action updates require human review because those steps are skipped on pull requests."
+            echo "eligible=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
           echo "eligible=true" >> "${GITHUB_OUTPUT}"
 
       - name: Wait for all required checks
@@ -60,6 +70,18 @@ jobs:
           set -euo pipefail
           gh pr checks "${PR_NUMBER}" --repo "${REPOSITORY}" \
             --required --watch --fail-fast --interval 10
+          checks=$(gh pr checks "${PR_NUMBER}" --repo "${REPOSITORY}" --json name,state)
+          for check_name in "build + lint" "fmt + validate + tflint + test"; do
+            check_state=$(jq -r --arg name "${check_name}" \
+              '[.[] | select(.name == $name)] |
+              if length == 1 then .[0].state else "MISSING_OR_DUPLICATE" end' \
+              <<< "${checks}")
+            if [[ "${check_state}" != "SUCCESS" ]]; then
+              echo "::error::${check_name} must pass before Dependabot auto-merge; state: ${check_state}"
+              exit 1
+            fi
+          done
+
           all_passed=$(gh pr checks "${PR_NUMBER}" --repo "${REPOSITORY}" \
             --required --json state --jq 'length > 0 and all(.[]; .state == "SUCCESS")')
           if [[ "${all_passed}" != "true" ]]; then
